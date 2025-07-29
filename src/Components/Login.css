@@ -1,0 +1,116 @@
+
+.login-page {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  min-height: 100vh;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 2rem;
+}
+
+.login-page .auth-container {
+  background: rgba(255, 255, 255, 0.95);
+  padding: 2.5rem;
+  border-radius: 20px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+  width: 100%; 
+  max-width: 400px;
+  transform: translateY(0);
+  opacity: 1;
+  transition: all 0.4s ease;
+}
+
+.login-page .auth-container:hover {
+  transform: translateY(-5px);
+}
+
+.login-page h2 {
+  color: #2d3748;
+  font-size: 2rem;
+  margin-bottom: 2rem;
+  text-align: center;
+  font-weight: 600;
+}
+
+.login-page form {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.login-page .input-group {
+  position: relative;
+}
+
+.login-page input {
+  width: 100%;
+  padding: 1rem;
+  border: 2px solid #e2e8f0;
+  border-radius: 8px;
+  font-size: 1rem;
+  transition: all 0.3s ease;
+  background: #f7fafc;
+}
+
+.login-page input:focus {
+  outline: none;
+  border-color: #667eea;
+  background: #fff;
+  box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+}
+
+.login-page input::placeholder {
+  color: #a0aec0;
+}
+
+.login-page button {
+  background: #667eea;
+  color: white;
+  padding: 1rem;
+  border: none;
+  border-radius: 8px;
+  font-size: 1rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.login-page button:hover {
+  background: #764ba2;
+  box-shadow: 0 5px 15px rgba(118, 75, 162, 0.3);
+}
+
+.login-page .signup-link {
+  text-align: center;
+  margin-top: 1.5rem;
+  color: #4a5568;
+}
+
+.login-page .signup-link a {
+  color: #667eea;
+  text-decoration: none;
+  font-weight: 500;
+  transition: color 0.3s ease;
+}
+
+.login-page .signup-link a:hover {
+  color: #764ba2;
+}
+
+.login-page .error-message {
+  color: #e53e3e;
+  margin-top: 1rem;
+  text-align: center;
+}
+
+@media (max-width: 480px) {
+  .login-page .auth-container {
+    padding: 1.5rem;
+  }
+  
+  .login-page h2 {
+    font-size: 1.75rem;
+  }
+}
