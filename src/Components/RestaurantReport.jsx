@@ -51,13 +51,17 @@ const RestaurantReport = ({ restaurantId }) => {
 
   const handleDownloadCSV = () => {
     if (!mealLogs.length) return;
-    const headers = ['Date', 'Client', 'Meal', 'Amount'];
-    const rows = mealLogs.map(log => [
-      log.timestamp ? new Date(log.timestamp).toLocaleString() : '',
-      log.clientName || (log.client && typeof log.client === 'object' ? log.client.name : log.client) || '',
-      log.mealName || log.meal || 'Meal',
-      log.initialBalance && log.remainingBalance ? `Frw ${log.initialBalance - log.remainingBalance}` : ''
-    ]);
+    const headers = ['Date', 'Client', 'Service', 'Amount'];
+    const rows = mealLogs.map(log => {
+      const isTopup = log.initialBalance && log.remainingBalance && (log.initialBalance - log.remainingBalance) < 0;
+      const serviceType = isTopup ? 'Topup' : 'Meal Purchase';
+      return [
+        log.timestamp ? new Date(log.timestamp).toLocaleString() : '',
+        log.clientName || (log.client && typeof log.client === 'object' ? log.client.name : log.client) || '',
+        serviceType,
+        log.initialBalance && log.remainingBalance ? `Frw ${Math.abs(log.initialBalance - log.remainingBalance)}` : ''
+      ];
+    });
     let csvContent = '';
     csvContent += headers.join(',') + '\n';
     rows.forEach(row => {
@@ -81,17 +85,19 @@ const RestaurantReport = ({ restaurantId }) => {
     const doc = new jsPDF();
     doc.setFontSize(14);
     doc.text('Meal Logs Report', 10, 10);
-    const headers = ['Date', 'Client', 'Meal', 'Amount'];
+    const headers = ['Date', 'Client', 'Service', 'Amount'];
     let y = 20;
     doc.setFontSize(10);
     doc.text(headers.join(' | '), 10, y);
     y += 6;
     mealLogs.slice(0, 40).forEach(log => {
+      const isTopup = log.initialBalance && log.remainingBalance && (log.initialBalance - log.remainingBalance) < 0;
+      const serviceType = isTopup ? 'Topup' : 'Meal Purchase';
       const row = [
         log.timestamp ? new Date(log.timestamp).toLocaleString() : '',
         log.clientName || (log.client && typeof log.client === 'object' ? log.client.name : log.client) || '',
-        log.mealName || log.meal || 'Meal',
-        log.initialBalance && log.remainingBalance ? `Frw ${log.initialBalance - log.remainingBalance}` : ''
+        serviceType,
+        log.initialBalance && log.remainingBalance ? `Frw ${Math.abs(log.initialBalance - log.remainingBalance)}` : ''
       ];
       doc.text(row.join(' | '), 10, y);
       y += 6;
@@ -168,7 +174,7 @@ const RestaurantReport = ({ restaurantId }) => {
                 <tr>
                   <th>Date</th>
                   <th>Client</th>
-                  <th>Meal</th>
+                  <th>Service</th>
                   <th>Amount</th>
                 </tr>
               </thead>
@@ -177,8 +183,8 @@ const RestaurantReport = ({ restaurantId }) => {
                   <tr key={log._id}>
                     <td>{log.timestamp ? new Date(log.timestamp).toLocaleString() : ''}</td>
                     <td>{log.clientName || (log.client && typeof log.client === 'object' ? log.client.name : log.client) || ''}</td>
-                    <td>{log.mealName || log.meal || 'Meal'}</td>
-                    <td>{log.initialBalance && log.remainingBalance ? `Frw ${log.initialBalance - log.remainingBalance}` : ''}</td>
+                    <td>{log.initialBalance && log.remainingBalance ? (log.initialBalance - log.remainingBalance < 0 ? 'Topup' : 'Meal Purchase') : 'Meal Purchase'}</td>
+                    <td>{log.initialBalance && log.remainingBalance ? `Frw ${Math.abs(log.initialBalance - log.remainingBalance)}` : ''}</td>
                   </tr>
                 ))}
               </tbody>

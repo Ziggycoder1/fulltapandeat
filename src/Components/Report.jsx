@@ -65,14 +65,18 @@ const Report = () => {
 
   const handleDownloadCSV = () => {
     if (!mealLogs.length) return;
-    const headers = ['Date', 'Client', 'Restaurant', 'Meal', 'Amount'];
-    const rows = mealLogs.map(log => [
-      log.timestamp ? new Date(log.timestamp).toLocaleString() : '',
-      log.clientName || (log.client && typeof log.client === 'object' ? log.client.name : log.client) || '',
-      log.restaurantName || (log.restaurant && typeof log.restaurant === 'object' ? log.restaurant.name : log.restaurant) || '',
-      log.mealName || log.meal || 'Meal',
-      log.initialBalance && log.remainingBalance ? `Frw ${log.initialBalance - log.remainingBalance}` : ''
-    ]);
+    const headers = ['Date', 'Client', 'Restaurant', 'Service', 'Amount'];
+    const rows = mealLogs.map(log => {
+      const isTopup = log.initialBalance && log.remainingBalance && (log.initialBalance - log.remainingBalance) < 0;
+      const serviceType = isTopup ? 'Topup' : 'Meal Purchase';
+      return [
+        log.timestamp ? new Date(log.timestamp).toLocaleString() : '',
+        log.clientName || (log.client && typeof log.client === 'object' ? log.client.name : log.client) || '',
+        log.restaurantName || (log.restaurant && typeof log.restaurant === 'object' ? log.restaurant.name : log.restaurant) || '',
+        serviceType,
+        log.initialBalance && log.remainingBalance ? `Frw ${Math.abs(log.initialBalance - log.remainingBalance)}` : ''
+      ];
+    });
     let csvContent = '';
     csvContent += headers.join(',') + '\n';
     rows.forEach(row => {
@@ -96,18 +100,20 @@ const Report = () => {
     const doc = new jsPDF();
     doc.setFontSize(14);
     doc.text('Meal Logs Report', 10, 10);
-    const headers = ['Date', 'Client', 'Restaurant', 'Meal', 'Amount'];
+    const headers = ['Date', 'Client', 'Restaurant', 'Service', 'Amount'];
     let y = 20;
     doc.setFontSize(10);
     doc.text(headers.join(' | '), 10, y);
     y += 6;
     mealLogs.slice(0, 40).forEach(log => {
+      const isTopup = log.initialBalance && log.remainingBalance && (log.initialBalance - log.remainingBalance) < 0;
+      const serviceType = isTopup ? 'Topup' : 'Meal Purchase';
       const row = [
         log.timestamp ? new Date(log.timestamp).toLocaleString() : '',
         log.clientName || (log.client && typeof log.client === 'object' ? log.client.name : log.client) || '',
         log.restaurantName || (log.restaurant && typeof log.restaurant === 'object' ? log.restaurant.name : log.restaurant) || '',
-        log.mealName || log.meal || 'Meal',
-        log.initialBalance && log.remainingBalance ? `Frw ${log.initialBalance - log.remainingBalance}` : ''
+        serviceType,
+        log.initialBalance && log.remainingBalance ? `Frw ${Math.abs(log.initialBalance - log.remainingBalance)}` : ''
       ];
       doc.text(row.join(' | '), 10, y);
       y += 6;
@@ -207,7 +213,7 @@ const Report = () => {
                   <th>Date</th>
                   <th>Client</th>
                   <th>Restaurant</th>
-                  <th>Meal</th>
+                  <th>Service</th>
                   <th>Amount</th>
                 </tr>
               </thead>
@@ -217,8 +223,8 @@ const Report = () => {
                     <td>{log.timestamp ? new Date(log.timestamp).toLocaleString() : ''}</td>
                     <td>{log.clientName || (log.client && typeof log.client === 'object' ? log.client.name : log.client) || ''}</td>
                     <td>{log.restaurantName || (log.restaurant && typeof log.restaurant === 'object' ? log.restaurant.name : log.restaurant) || ''}</td>
-                    <td>{log.mealName || log.meal || 'Meal'}</td>
-                    <td>{log.initialBalance && log.remainingBalance ? `Frw ${log.initialBalance - log.remainingBalance}` : ''}</td>
+                    <td>{log.initialBalance && log.remainingBalance ? (log.initialBalance - log.remainingBalance < 0 ? 'Topup' : 'Meal Purchase') : 'Meal Purchase'}</td>
+                    <td>{log.initialBalance && log.remainingBalance ? `Frw ${Math.abs(log.initialBalance - log.remainingBalance)}` : ''}</td>
                   </tr>
                 ))}
               </tbody>

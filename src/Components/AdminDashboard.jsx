@@ -3,13 +3,15 @@ import { useNavigate } from 'react-router-dom';
 import { 
   FiUsers, FiDollarSign, FiPieChart, FiSettings, FiPlus, 
   FiMenu, FiX, FiBell, FiEdit, FiTrash2, FiLogOut,
-  FiSun, FiMoon, FiSearch, FiRefreshCw, FiArrowUp, FiArrowDown
+  FiSun, FiMoon, FiSearch, FiRefreshCw, FiArrowUp, FiArrowDown, FiBarChart2
 } from 'react-icons/fi';
 import { Bar, Pie } from 'react-chartjs-2';
 import { Chart, CategoryScale, LinearScale, BarElement, ArcElement, Title, Tooltip, Legend } from 'chart.js';
 import './AdminDashboard.css';
 import { apiRequest } from '../api';
 import Report from './Report';
+import Users from './Users';
+import UniversityAnalytics from './UniversityAnalytics';
 
 // Register Chart.js components
 Chart.register(
@@ -31,12 +33,116 @@ const AdminDashboard = () => {
     }
   }, []);
   // UI State
-  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(() => {
+    // Check if we're on mobile first
+    if (window.innerWidth < 1025) return false;
+    // Otherwise, get the saved preference or default to true
+    return localStorage.getItem('sidebarCollapsed') !== 'true';
+  });
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
+  const [isMobile, setIsMobile] = useState(window.innerWidth < 1025);
+  
+  // Handle window resize and device detection
+  useEffect(() => {
+    const handleResize = () => {
+      const mobile = window.innerWidth < 1025; // 1025px and above is considered desktop
+      setIsMobile(mobile);
+      
+      if (mobile) {
+        // On mobile, collapse the sidebar by default
+        setIsSidebarOpen(false);
+        document.body.style.overflow = isMobileMenuOpen ? 'hidden' : 'auto';
+      } else {
+        // On desktop, show the sidebar by default
+        const savedState = localStorage.getItem('sidebarCollapsed');
+        setIsSidebarOpen(savedState !== 'true');
+        setIsMobileMenuOpen(false);
+        document.body.style.overflow = 'auto';
+      }
+    };
+    
+    // Initial check
+    handleResize();
+
+    window.addEventListener('resize', handleResize);
+    return () => {
+      window.removeEventListener('resize', handleResize);
+      document.body.style.overflow = 'auto';
+    };
+  }, [isMobileMenuOpen]);
+  
+  // Close mobile menu when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (isMobileMenuOpen && !e.target.closest('.sidebar') && !e.target.closest('.mobile-menu-toggle')) {
+        setIsMobileMenuOpen(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [isMobileMenuOpen]);
+  
+  const toggleSidebar = () => {
+    if (isMobile) {
+      // On mobile, toggle the mobile menu
+      const newMobileState = !isMobileMenuOpen;
+      setIsMobileMenuOpen(newMobileState);
+      document.body.style.overflow = newMobileState ? 'hidden' : 'auto';
+    } else {
+      // On desktop, toggle between expanded and collapsed states
+      const newState = !isSidebarOpen;
+      setIsSidebarOpen(newState);
+      localStorage.setItem('sidebarCollapsed', !newState);
+    }
+  };
+  
+  // Update body overflow when mobile menu is open/closed
+  useEffect(() => {
+    if (isMobile) {
+      document.body.style.overflow = isMobileMenuOpen ? 'hidden' : 'auto';
+    }
+    return () => {
+      document.body.style.overflow = 'auto';
+    };
+  }, [isMobileMenuOpen, isMobile]);
+  
+  const closeMobileMenu = () => {
+    if (isMobile) {
+      setIsMobileMenuOpen(false);
+    }
+  };
   const [selectedSection, setSelectedSection] = useState('dashboard');
   const [darkMode, setDarkMode] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  
+  // Get page title based on selected section
+  const getPageTitle = useCallback(() => {
+    switch (selectedSection) {
+      case 'dashboard':
+        return 'Dashboard';
+      case 'restaurants':
+        return 'Restaurants';
+      case 'users':
+        return 'Users';
+      case 'logs':
+        return 'Meal Logs';
+      case 'report':
+        return 'Reports';
+      case 'university':
+        return 'University Analytics';
+      case 'settings':
+        return 'Settings';
+      default:
+        return 'Dashboard';
+    }
+  }, [selectedSection]);
+  
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 10;
   
   // User State
   const [currentUser, setCurrentUser] = useState(null);
@@ -99,6 +205,20 @@ const AdminDashboard = () => {
   const [adminFormError, setAdminFormError] = useState('');
   const [adminFormSuccess, setAdminFormSuccess] = useState('');
   
+  // New Client Form State
+  const [newClient, setNewClient] = useState({
+    name: '',
+    email: '',
+    phone: '',
+    idNumber: '',
+    cardNumber: '',
+    yearOfStudy: '',
+    fieldOfStudy: ''
+  });
+  const [addingClient, setAddingClient] = useState(false);
+  const [clientFormError, setClientFormError] = useState('');
+  const [clientFormSuccess, setClientFormSuccess] = useState('');
+  
   // Chart data state
   const [revenueChartData, setRevenueChartData] = useState({
     labels: [],
@@ -146,9 +266,20 @@ const AdminDashboard = () => {
 
   const filteredUsers = useMemo(() => {
     return users.filter(user => 
-      user.name.toLowerCase().includes(searchQuery.toLowerCase())
+      user.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (user.email && user.email.toLowerCase().includes(searchQuery.toLowerCase()))
     );
   }, [users, searchQuery]);
+
+  // Calculate pagination
+  const totalPages = Math.ceil(filteredUsers.length / itemsPerPage);
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const paginatedUsers = filteredUsers.slice(startIndex, startIndex + itemsPerPage);
+
+  const handlePageChange = (page) => {
+    setCurrentPage(page);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
 
 
 
@@ -366,16 +497,19 @@ const AdminDashboard = () => {
         .slice(0, 5)
         .map((log, index) => {
           const timeAgo = getTimeAgo(new Date(log.timestamp));
+          const balanceDifference = log.initialBalance - log.remainingBalance;
+          const isTopup = balanceDifference < 0;
           const amount = log.initialBalance && log.remainingBalance 
-            ? `Frw ${log.initialBalance - log.remainingBalance}`
+            ? `Frw ${Math.abs(balanceDifference)}`
             : '';
           
           return {
             id: index + 1,
             user: log.clientName || 'Unknown',
-            action: 'Purchased meal',
+            action: isTopup ? 'Topped up' : 'Purchased meal',
             time: timeAgo,
             amount: amount,
+            isTopup: isTopup,
           };
         });
 
@@ -441,6 +575,14 @@ const AdminDashboard = () => {
     window.location.href = '/login';
   };
 
+  // Calculate restaurant amount (total revenue from meal logs)
+  const calculateRestaurantAmount = (restaurant) => {
+    // This is a placeholder - in a real implementation, you would calculate this from meal logs
+    // For now, we'll return a calculated value based on meal price and some mock data
+    const mockTransactionCount = Math.floor(Math.random() * 100) + 50; // Random between 50-150
+    return restaurant.mealPrice * mockTransactionCount;
+  };
+
   // Form handlers
   const handleAddRestaurant = async (e) => {
     e.preventDefault();
@@ -470,6 +612,51 @@ const AdminDashboard = () => {
       setRestaurantFormError(err.message || 'Failed to create restaurant.');
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  // Client form handlers
+  const handleNewClientChange = (e) => {
+    const { name, value } = e.target;
+    setNewClient(prev => ({
+      ...prev,
+      [name]: value
+    }));
+  };
+
+  const handleAddClient = async (e) => {
+    e.preventDefault();
+    setClientFormError('');
+    setClientFormSuccess('');
+    
+    if (!newClient.name || !newClient.email || !newClient.phone || !newClient.idNumber || !newClient.cardNumber || !newClient.yearOfStudy || !newClient.fieldOfStudy) {
+      setClientFormError('Please fill all required fields');
+      return;
+    }
+
+    try {
+      setAddingClient(true);
+      await apiRequest('/client', {
+        method: 'POST',
+        body: newClient,
+        token: localStorage.getItem('token'),
+      });
+      setClientFormSuccess('Client created successfully!');
+      setNewClient({
+        name: '',
+        email: '',
+        phone: '',
+        idNumber: '',
+        cardNumber: '',
+        yearOfStudy: '',
+        fieldOfStudy: ''
+      });
+      // Refresh users list to show the new client
+      await fetchUsers();
+    } catch (err) {
+      setClientFormError(err.message || 'Failed to create client.');
+    } finally {
+      setAddingClient(false);
     }
   };
 
@@ -636,17 +823,30 @@ const AdminDashboard = () => {
 
   return (
     <div className={`dashboard-container ${!isSidebarOpen && 'collapsed'} ${darkMode && 'dark-mode'}`}>
-      {/* Sidebar */}
-      <div className={`sidebar${isSidebarOpen ? ' open' : ' collapsed'}`}>
-        <div className="sidebar-header">
-          {isSidebarOpen && <h2>Tape & Eat</h2>}
-          <button
-            className="toggle-btn"
-            onClick={() => setIsSidebarOpen(!isSidebarOpen)}
-            aria-label={isSidebarOpen ? "Collapse sidebar" : "Expand sidebar"}
+      {/* Mobile Menu Overlay */}
+      <div 
+        className={`mobile-overlay ${isMobileMenuOpen ? 'open' : ''}`}
+        onClick={closeMobileMenu}
+      />
+      
+      {/* Mobile Header */}
+      {isMobile && (
+        <div className="mobile-header">
+          <button 
+            className="mobile-menu-toggle"
+            onClick={toggleSidebar}
+            aria-label={isMobileMenuOpen ? "Close menu" : "Open menu"}
           >
-            {isSidebarOpen ? <FiX /> : <FiMenu />}
+            {isMobileMenuOpen ? <FiX /> : <FiMenu />}
           </button>
+          <h3>Tape & Eat</h3>
+        </div>
+      )}
+      
+      {/* Sidebar */}
+      <div className={`sidebar ${isMobileMenuOpen ? 'mobile-open' : ''} ${!isMobile && isSidebarOpen ? 'open' : ''}`}>
+        <div className="sidebar-header">
+          <h2>Tape & Eat</h2>
         </div>
         
         <nav className="sidebar-nav">
@@ -687,6 +887,14 @@ const AdminDashboard = () => {
           </button>
           
           <button 
+            className={`nav-item${selectedSection === 'university' ? ' active' : ''}`} 
+            onClick={() => setSelectedSection('university')}
+          >
+            <FiBarChart2 style={{ marginRight: 8 }} />
+            University Analytics
+          </button>
+          
+          <button 
             className={`nav-item${selectedSection === 'settings' ? ' active' : ''}`} 
             onClick={() => setSelectedSection('settings')}
           >
@@ -711,7 +919,16 @@ const AdminDashboard = () => {
         {/* Top Navigation */}
         <div className="top-navbar">
           <div className="nav-left">
-            <h3>Admin Dashboard</h3>
+            {!isMobile && (
+              <button 
+                className="desktop-menu-toggle"
+                onClick={toggleSidebar}
+                aria-label="Toggle sidebar"
+              >
+                {isSidebarOpen ? <FiX /> : <FiMenu />}
+              </button>
+            )}
+            <h3>{getPageTitle()}</h3>
           </div>
           
           <div className="nav-right">
@@ -950,80 +1167,240 @@ const AdminDashboard = () => {
                 </div>
               </div>
 
+              {/* Add Client Form */}
+              <div className="add-client-form">
+                <h3>Add New Client</h3>
+                <form onSubmit={handleAddClient} className="form-card">
+                  {/* Error and Success Messages */}
+                  {clientFormError && (
+                    <div className="error-message">
+                      <p>{clientFormError}</p>
+                    </div>
+                  )}
+                  {clientFormSuccess && (
+                    <div className="success-message">
+                      <p>{clientFormSuccess}</p>
+                    </div>
+                  )}
+                  <div className="form-grid">
+                    <div className="form-group">
+                      <label>Name</label>
+                      <input 
+                        type="text" 
+                        name="name"
+                        value={newClient.name} 
+                        onChange={handleNewClientChange} 
+                        required 
+                        placeholder="Enter client name"
+                      />
+                    </div>
+                    
+                    <div className="form-group">
+                      <label>Email</label>
+                      <input 
+                        type="email" 
+                        name="email"
+                        value={newClient.email} 
+                        onChange={handleNewClientChange} 
+                        required 
+                        placeholder="Enter email address"
+                      />
+                    </div>
+                    
+                    <div className="form-group">
+                      <label>Phone</label>
+                      <input 
+                        type="tel" 
+                        name="phone"
+                        value={newClient.phone} 
+                        onChange={handleNewClientChange} 
+                        required 
+                        placeholder="Enter phone number"
+                      />
+                    </div>
+                    
+                    <div className="form-group">
+                      <label>ID Number</label>
+                      <input 
+                        type="text" 
+                        name="idNumber"
+                        value={newClient.idNumber} 
+                        onChange={handleNewClientChange} 
+                        required 
+                        placeholder="Enter ID number"
+                      />
+                    </div>
+                    
+                    <div className="form-group">
+                      <label>Card Number</label>
+                      <input 
+                        type="text" 
+                        name="cardNumber"
+                        value={newClient.cardNumber} 
+                        onChange={handleNewClientChange} 
+                        required 
+                        placeholder="Enter card number"
+                      />
+                    </div>
+                    
+                    <div className="form-group">
+                      <label>Year of Study</label>
+                      <select 
+                        name="yearOfStudy"
+                        value={newClient.yearOfStudy} 
+                        onChange={handleNewClientChange} 
+                        required 
+                      >
+                        <option value="">Select year</option>
+                        <option value="Y1">Y1 - First Year</option>
+                        <option value="Y2">Y2 - Second Year</option>
+                        <option value="Y3">Y3 - Third Year</option>
+                        <option value="Y4">Y4 - Fourth Year</option>
+                        <option value="Y5+">Y5+ - Fifth Year+</option>
+                      </select>
+                    </div>
+                    
+                    <div className="form-group">
+                      <label>Field of Study</label>
+                      <input 
+                        type="text" 
+                        name="fieldOfStudy"
+                        value={newClient.fieldOfStudy} 
+                        onChange={handleNewClientChange} 
+                        required 
+                        placeholder="e.g., IT, Engineering, Medicine"
+                      />
+                    </div>
+                  </div>
+                  
+                  <div className="form-actions">
+                    <button type="submit" className="btn btn-primary" disabled={addingClient}>
+                      {addingClient ? <FiRefreshCw className="spinner" /> : <FiPlus />}
+                      {addingClient ? 'Adding Client...' : 'Add Client'}
+                    </button>
+                  </div>
+                </form>
+              </div>
+
               {/* User Balances */}
               <div className="user-balances">
                 <h3>User Balances</h3>
-                <div className="table-responsive">
-                  <table className="data-table">
-                    <thead>
-                      <tr>
-                        <th>Name</th>
-                        <th>Balance</th>
-                        <th>Meals</th>
-                        <th>Last Active</th>
-                        <th>Actions</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {loadingUsers ? (
+                <div className="table-container">
+                  <div className="table-responsive">
+                    <table className="data-table">
+                      <thead>
                         <tr>
-                          <td colSpan="5" style={{ textAlign: 'center', padding: '2rem' }}>
-                            <FiRefreshCw className="spinner" /> Loading users...
-                          </td>
+                          <th>Name</th>
+                          <th>Email</th>
+                          <th>Phone</th>
+                          <th>Year</th>
+                          <th>Field</th>
+                          <th>Balance</th>
+                          <th>Actions</th>
                         </tr>
-                      ) : usersError ? (
-                        <tr>
-                          <td colSpan="5" style={{ textAlign: 'center', color: 'var(--error-color)' }}>
-                            {usersError}
-                          </td>
-                        </tr>
-                      ) : filteredUsers.length === 0 ? (
-                        <tr>
-                          <td colSpan="5" style={{ textAlign: 'center', color: 'var(--text-muted)' }}>
-                            No users found
-                          </td>
-                        </tr>
-                      ) : (
-                        filteredUsers.map(user => {
-                          // Calculate total balance across all subscriptions
-                          const totalBalance = user.subscriptions 
-                            ? user.subscriptions.reduce((total, sub) => total + (sub.balance || 0), 0)
-                            : 0;
-                          
-                          // Count total meals (this would need to be calculated from meal logs)
-                          const mealCount = 0; // Placeholder - would need to count from meal logs
-                          
-                          // Get last active date from subscriptions or use a default
-                          const lastActive = user.subscriptions && user.subscriptions.length > 0
-                            ? new Date().toLocaleDateString() // Placeholder - would need real last active data
-                            : 'Never';
+                      </thead>
+                      <tbody>
+                        {loadingUsers ? (
+                          <tr>
+                            <td colSpan="7" style={{ textAlign: 'center', padding: '2rem' }}>
+                              <FiRefreshCw className="spinner" /> Loading users...
+                            </td>
+                          </tr>
+                        ) : usersError ? (
+                          <tr>
+                            <td colSpan="7" style={{ textAlign: 'center', color: 'var(--error-color)' }}>
+                              {usersError}
+                            </td>
+                          </tr>
+                        ) : filteredUsers.length === 0 ? (
+                          <tr>
+                            <td colSpan="7" style={{ textAlign: 'center', color: 'var(--text-muted)' }}>
+                              No users found
+                            </td>
+                          </tr>
+                        ) : (
+                          paginatedUsers.map(user => {
+                            // Calculate total balance across all subscriptions
+                            const totalBalance = user.subscriptions 
+                              ? user.subscriptions.reduce((total, sub) => total + (sub.balance || 0), 0)
+                              : 0;
+                            
+                            // Count total meals (this would need to be calculated from meal logs)
+                            const mealCount = 0; // Placeholder - would need to count from meal logs
+                            
+                            // Get last active date from subscriptions or use a default
+                            const lastActive = user.subscriptions && user.subscriptions.length > 0
+                              ? new Date().toLocaleDateString() // Placeholder - would need real last active data
+                              : 'Never';
 
-                          return (
-                            <tr key={user._id}>
-                              <td>{user.name}</td>
-                              <td>Frw {totalBalance.toLocaleString()}</td>
-                              <td>{mealCount}</td>
-                              <td>{lastActive}</td>
-                              <td className="actions">
-                                <button 
-                                  className="btn btn-outline btn-sm"
-                                  onClick={() => handleBalanceUpdate(user._id, 500)}
-                                >
-                                  +500
-                                </button>
-                                <button 
-                                  className="btn btn-outline btn-sm"
-                                  onClick={() => handleBalanceUpdate(user._id, -500)}
-                                >
-                                  -500
-                                </button>
-                              </td>
-                            </tr>
-                          );
-                        })
-                      )}
-                    </tbody>
-                  </table>
+                            return (
+                              <tr key={user._id}>
+                                <td>{user.name}</td>
+                                <td>{user.email}</td>
+                                <td>{user.phone}</td>
+                                <td>{user.yearOfStudy || '-'}</td>
+                                <td>{user.fieldOfStudy || '-'}</td>
+                                <td>Frw {totalBalance.toLocaleString()}</td>
+                                <td className="actions">
+                                  <button 
+                                    className="btn btn-outline btn-sm"
+                                    onClick={() => handleBalanceUpdate(user._id, 500)}
+                                  >
+                                    +500
+                                  </button>
+                                  <button 
+                                    className="btn btn-outline btn-sm"
+                                    onClick={() => handleBalanceUpdate(user._id, -500)}
+                                  >
+                                    -500
+                                  </button>
+                                </td>
+                              </tr>
+                            );
+                          })
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                  <div className="pagination">
+                    <button 
+                      className="btn btn-outline" 
+                      onClick={() => handlePageChange(1)}
+                      disabled={currentPage === 1}
+                    >
+                      First
+                    </button>
+                    <button 
+                      className="btn btn-outline" 
+                      onClick={() => handlePageChange(currentPage - 1)}
+                      disabled={currentPage === 1}
+                    >
+                      Prev
+                    </button>
+                    {Array.from({ length: totalPages }, (_, i) => i + 1).map(page => (
+                      <button 
+                        key={page} 
+                        className={`btn ${currentPage === page ? 'active' : 'outline'}`} 
+                        onClick={() => handlePageChange(page)}
+                      >
+                        {page}
+                      </button>
+                    ))}
+                    <button 
+                      className="btn btn-outline" 
+                      onClick={() => handlePageChange(currentPage + 1)}
+                      disabled={currentPage === totalPages}
+                    >
+                      Next
+                    </button>
+                    <button 
+                      className="btn btn-outline" 
+                      onClick={() => handlePageChange(totalPages)}
+                      disabled={currentPage === totalPages}
+                    >
+                      Last
+                    </button>
+                  </div>
                 </div>
               </div>
             </>
@@ -1121,6 +1498,7 @@ const AdminDashboard = () => {
                         <th>Name</th>
                         <th>Email</th>
                         <th>Meal Price</th>
+                        <th>Amount</th>
                         <th>Devices</th>
                         <th>Actions</th>
                       </tr>
@@ -1129,7 +1507,7 @@ const AdminDashboard = () => {
                       {filteredRestaurants.map((restaurant) => (
                         editRestaurant === restaurant._id ? (
                           <tr key={restaurant._id}>
-                            <td colSpan="5">
+                            <td colSpan="6">
                               <form onSubmit={handleEditRestaurant} className="edit-form">
                                 <div className="form-grid">
                                   <div className="form-group">
@@ -1190,6 +1568,7 @@ const AdminDashboard = () => {
                             <td>{restaurant.name}</td>
                             <td>{restaurant.email}</td>
                             <td>Frw {restaurant.mealPrice}</td>
+                            <td>Frw {calculateRestaurantAmount(restaurant).toLocaleString()}</td>
                                                          <td>
                                {Array.isArray(restaurant.devices)
                                  ? restaurant.devices.map(d => d.deviceId || d).join(', ')
@@ -1222,90 +1601,7 @@ const AdminDashboard = () => {
             </div>
           )}
 
-          {selectedSection === 'users' && (
-            <div className="section-container">
-              <div className="section-header">
-                <h2>Admin Users</h2>
-                <div className="section-actions">
-                  <span className="results-count">
-                    Showing {filteredAdmins.length} of {admins.length} admins
-                  </span>
-                </div>
-              </div>
-              
-              <form onSubmit={handleAddAdmin} className="form-card">
-                <h3>Add New Admin</h3>
-                <div className="form-grid">
-                  <div className="form-group">
-                    <label>Username</label>
-                    <input 
-                      type="text" 
-                      value={newAdmin.username} 
-                      onChange={e => setNewAdmin({ ...newAdmin, username: e.target.value })} 
-                      required 
-                    />
-                  </div>
-                  
-                  <div className="form-group">
-                    <label>Password</label>
-                    <input 
-                      type="password" 
-                      value={newAdmin.password} 
-                      onChange={e => setNewAdmin({ ...newAdmin, password: e.target.value })} 
-                      required 
-                    />
-                  </div>
-                </div>
-                
-                <button type="submit" className="btn btn-primary" disabled={isLoading}>
-                  {isLoading ? 'Processing...' : 'Add Admin'}
-                </button>
-                
-                {adminFormError && <div className="error-message">{adminFormError}</div>}
-                {adminFormSuccess && <div className="success-message">{adminFormSuccess}</div>}
-              </form>
-              
-              {loadingAdmins ? (
-                <div className="loading-state">
-                  <FiRefreshCw className="spinner" /> Loading admins...
-                </div>
-              ) : adminsError ? (
-                <div className="error-state">
-                  {adminsError}
-                  <button className="btn btn-outline" onClick={fetchAdmins}>
-                    <FiRefreshCw /> Retry
-                  </button>
-                </div>
-              ) : (
-                <div className="table-responsive">
-                  <table className="data-table">
-                    <thead>
-                      <tr>
-                        <th>Username</th>
-                        <th>Actions</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {filteredAdmins.map((admin) => (
-                        <tr key={admin._id}>
-                          <td>{admin.username}</td>
-                          <td className="actions">
-                            <button 
-                              className="btn btn-outline btn-sm"
-                              onClick={() => handleDeleteAdmin(admin._id)}
-                              disabled={isLoading}
-                            >
-                              <FiTrash2 /> Delete
-                            </button>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-            </div>
-          )}
+{selectedSection === 'users' && <Users />}
 
           {selectedSection === 'logs' && (
             <div className="section-container">
@@ -1360,6 +1656,10 @@ const AdminDashboard = () => {
 
           {selectedSection === 'report' && (
             <Report />
+          )}
+
+          {selectedSection === 'university' && (
+            <UniversityAnalytics />
           )}
 
           {selectedSection === 'settings' && (

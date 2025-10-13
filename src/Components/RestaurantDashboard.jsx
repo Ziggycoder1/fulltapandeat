@@ -6,6 +6,7 @@ import './AdminDashboard.css';
 import { apiRequest } from '../api';
 import { useNavigate } from 'react-router-dom';
 import RestaurantReport from './RestaurantReport';
+import RestaurantAnalytics from './RestaurantAnalytics';
 
 // Register Chart.js components
 Chart.register(
@@ -37,7 +38,7 @@ const RestaurantDashboard = () => {
   const [clients, setClients] = useState([]);
   const [loadingClients, setLoadingClients] = useState(false);
   const [clientsError, setClientsError] = useState('');
-  const [newClient, setNewClient] = useState({ name: '', phone: '', idNumber: '', cardNumber: '' });
+  const [newClient, setNewClient] = useState({ name: '', phone: '', idNumber: '', cardNumber: '', yearOfStudy: '', fieldOfStudy: '' });
   const [clientFormError, setClientFormError] = useState('');
   const [clientFormSuccess, setClientFormSuccess] = useState('');
   const [clientActionError, setClientActionError] = useState('');
@@ -360,6 +361,26 @@ const [downloadMessage, setDownloadMessage] = useState('');
     fetchCurrentUser();
   }, []);
 
+  // Fetch meal logs on component mount and when restaurantId changes
+  useEffect(() => {
+    if (restaurantId && restaurantId !== 'mock-restaurant-id') {
+      setLoadingLogs(true);
+      setLogsError('');
+      apiRequest(`/restaurants/logs?restaurantId=${restaurantId}`, {
+        method: 'GET',
+        token: localStorage.getItem('token'),
+      })
+        .then((data) => {
+          setMealLogs(data);
+          setLoadingLogs(false);
+        })
+        .catch((err) => {
+          setLogsError(err.message || 'Failed to fetch meal logs.');
+          setLoadingLogs(false);
+        });
+    }
+  }, [restaurantId]);
+
   // Fetch recent activity
   const fetchRecentActivity = useCallback(async () => {
     try {
@@ -380,14 +401,15 @@ const [downloadMessage, setDownloadMessage] = useState('');
         .slice(0, 5)
         .map((log, index) => {
           const timeAgo = getTimeAgo(new Date(log.timestamp));
-          const amount = log.initialBalance && log.remainingBalance 
-            ? `Frw ${log.initialBalance - log.remainingBalance}`
-            : '';
+          const actionText = log.actionType === 'topup' 
+            ? 'Topped up balance' 
+            : 'Purchased meal';
+          const amount = log.amount ? `Frw ${log.amount}` : '';
           
           return {
             id: index + 1,
             user: log.clientName || 'Unknown',
-            action: 'Purchased meal',
+            action: actionText,
             time: timeAgo,
             amount: amount,
           };
@@ -427,7 +449,7 @@ const [downloadMessage, setDownloadMessage] = useState('');
         token: localStorage.getItem('token'),
       });
       setClientFormSuccess('Client created successfully!');
-      setNewClient({ name: '', phone: '', idNumber: '', cardNumber: '' });
+      setNewClient({ name: '', phone: '', idNumber: '', cardNumber: '', yearOfStudy: '', fieldOfStudy: '' });
       // Refresh client list
       setLoadingClients(true);
       apiRequest(`/restaurants/clients?restaurantId=${restaurantId}`, {
@@ -451,6 +473,15 @@ const [downloadMessage, setDownloadMessage] = useState('');
         setClientFormError(err.message || 'Failed to create client.');
       }
     }
+  };
+
+  // Calculate client amount (total balance across all subscriptions)
+  const calculateClientAmount = (client) => {
+    // Calculate total balance from all subscriptions
+    if (client.subscriptions && Array.isArray(client.subscriptions)) {
+      return client.subscriptions.reduce((total, sub) => total + (sub.balance || 0), 0);
+    }
+    return 0;
   };
 
   const refreshClients = () => {
@@ -770,6 +801,9 @@ const [downloadMessage, setDownloadMessage] = useState('');
           <button className={`nav-item${selectedSection === 'dashboard' ? ' active' : ''}`} onClick={() => setSelectedSection('dashboard')}>
             <FiPieChart /> {isSidebarOpen && 'Dashboard'}
           </button>
+          <button className={`nav-item${selectedSection === 'analytics' ? ' active' : ''}`} onClick={() => setSelectedSection('analytics')}>
+            <FiPieChart /> {isSidebarOpen && 'Analytics'}
+          </button>
           <button className={`nav-item${selectedSection === 'clients' ? ' active' : ''}`} onClick={() => setSelectedSection('clients')}>
             <FiUsers /> {isSidebarOpen && 'Clients'}
           </button>
@@ -1014,6 +1048,9 @@ const [downloadMessage, setDownloadMessage] = useState('');
               </div>
             </>
           )}
+          {selectedSection === 'analytics' && (
+            <RestaurantAnalytics restaurantId={restaurantId} />
+          )}
           {selectedSection === 'clients' && (
             <div style={deepseekCardStyle}>
               <h2 style={deepseekFormTitle}>Clients</h2>
@@ -1064,6 +1101,33 @@ const [downloadMessage, setDownloadMessage] = useState('');
                       required
                     />
                   </div>
+                  <div style={deepseekFormGroup}>
+                    <label>Year of Study</label>
+                    <select
+                      style={deepseekInput}
+                      value={newClient.yearOfStudy}
+                      onChange={e => setNewClient({ ...newClient, yearOfStudy: e.target.value })}
+                      required
+                    >
+                      <option value="">Select Year</option>
+                      <option value="Y1">Y1 (First Year)</option>
+                      <option value="Y2">Y2 (Second Year)</option>
+                      <option value="Y3">Y3 (Third Year)</option>
+                      <option value="Y4">Y4 (Fourth Year)</option>
+                      <option value="Y5+">Y5+ (Fifth Year+)</option>
+                    </select>
+                  </div>
+                  <div style={deepseekFormGroup}>
+                    <label>Field of Study</label>
+                    <input
+                      type="text"
+                      style={deepseekInput}
+                      placeholder="e.g., IT, Engineering, Medicine, Business"
+                      value={newClient.fieldOfStudy}
+                      onChange={e => setNewClient({ ...newClient, fieldOfStudy: e.target.value })}
+                      required
+                    />
+                  </div>
                   <button type="submit" style={deepseekButton} disabled={loadingClients}>Add Client</button>
                 </div>
                 {clientFormError && <div className="error-message" style={{ marginTop: '1rem' }}>{clientFormError}</div>}
@@ -1082,6 +1146,9 @@ const [downloadMessage, setDownloadMessage] = useState('');
                         <th style={deepseekTh}>Phone</th>
                         <th style={deepseekTh}>ID Number</th>
                         <th style={deepseekTh}>Card Number</th>
+                        <th style={deepseekTh}>Year</th>
+                        <th style={deepseekTh}>Field</th>
+                        <th style={deepseekTh}>Amount</th>
                         <th style={deepseekTh}>Actions</th>
                       </tr>
                     </thead>
@@ -1092,6 +1159,9 @@ const [downloadMessage, setDownloadMessage] = useState('');
                           <td style={deepseekTd}>{c.phone}</td>
                           <td style={deepseekTd}>{c.idNumber}</td>
                           <td style={deepseekTd}>{c.cardNumber}</td>
+                          <td style={deepseekTd}>{c.yearOfStudy || '-'}</td>
+                          <td style={deepseekTd}>{c.fieldOfStudy || '-'}</td>
+                          <td style={deepseekTd}>Frw {calculateClientAmount(c).toLocaleString()}</td>
                           <td style={{ ...deepseekTd, display: 'flex', gap: '0.5rem' }}>
                             <button className="action-btn card-btn" title="Update Card" onClick={() => handleUpdateCard(c.cardNumber)}><FiCreditCard /></button>
                             <button className="action-btn edit-btn" title="Edit Details" onClick={() => handleEditDetails(c)}><FiEdit /></button>
@@ -1121,7 +1191,7 @@ const [downloadMessage, setDownloadMessage] = useState('');
                       <tr>
                         <th style={deepseekTh}>Date</th>
                         <th style={deepseekTh}>Client</th>
-                        <th style={deepseekTh}>Meal</th>
+                        <th style={deepseekTh}>Action</th>
                         <th style={deepseekTh}>Amount</th>
                       </tr>
                     </thead>
@@ -1130,8 +1200,14 @@ const [downloadMessage, setDownloadMessage] = useState('');
                         <tr key={log._id} style={deepseekRow(idx)}>
                           <td style={deepseekTd}>{log.timestamp ? new Date(log.timestamp).toLocaleString() : ''}</td>
                           <td style={deepseekTd}>{log.clientName || (log.client && typeof log.client === 'object' ? log.client.name : log.client) || ''}</td>
-                          <td style={deepseekTd}>{log.mealName || log.meal || 'Meal'}</td>
-                          <td style={deepseekTd}>{log.initialBalance && log.remainingBalance ? `Frw ${log.initialBalance - log.remainingBalance}` : ''}</td>
+                          <td style={deepseekTd}>
+                            <span className={`action-badge ${log.actionType}`}>
+                              {log.actionType === 'purchase' ? '🍽️ Meal Purchase' : '💰 Top-up'}
+                            </span>
+                          </td>
+                          <td style={deepseekTd}>
+                            {log.amount ? `Frw ${log.amount}` : ''}
+                          </td>
                         </tr>
                       ))}
                     </tbody>
