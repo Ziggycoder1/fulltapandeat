@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { FiUsers, FiDollarSign, FiPieChart, FiSettings, FiMenu, FiX, FiBell, FiEdit, FiCreditCard, FiArrowUpCircle, FiRefreshCw, FiLogOut, FiArrowUp, FiArrowDown } from 'react-icons/fi';
+import { FiUsers, FiDollarSign, FiPieChart, FiSettings, FiMenu, FiX, FiBell, FiEdit, FiCreditCard, FiArrowUpCircle, FiRefreshCw, FiLogOut, FiArrowUp, FiArrowDown, FiSun, FiMoon } from 'react-icons/fi';
 import { Bar, Pie } from 'react-chartjs-2';
 import { Chart, CategoryScale, LinearScale, BarElement, ArcElement, Title, Tooltip, Legend } from 'chart.js';
 import './AdminDashboard.css';
@@ -27,9 +27,17 @@ const RestaurantDashboard = () => {
       navigate('/login', { replace: true });
     }
   }, []);
-  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+  // UI state (aligned with AdminDashboard responsiveness)
+  const [isSidebarOpen, setIsSidebarOpen] = useState(() => {
+    if (typeof window !== 'undefined' && window.innerWidth < 1025) return false;
+    const saved = localStorage.getItem('sidebarCollapsedRestaurant');
+    return saved ? saved !== 'true' : true;
+  });
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
+  const [isMobile, setIsMobile] = useState(typeof window !== 'undefined' ? window.innerWidth < 1025 : false);
   const [selectedSection, setSelectedSection] = useState('dashboard');
+  const [darkMode, setDarkMode] = useState(false);
   
   // User State
   const [currentUser, setCurrentUser] = useState(null);
@@ -85,6 +93,64 @@ const [downloadMessage, setDownloadMessage] = useState('');
   
   // Get restaurantId from current user or localStorage
   const [restaurantId, setRestaurantId] = useState(localStorage.getItem('restaurantId') || 'mock-restaurant-id');
+
+  // Handle window resize and device detection (match AdminDashboard)
+  useEffect(() => {
+    const handleResize = () => {
+      const mobile = window.innerWidth < 1025;
+      setIsMobile(mobile);
+      if (mobile) {
+        setIsSidebarOpen(false);
+        document.body.style.overflow = isMobileMenuOpen ? 'hidden' : 'auto';
+      } else {
+        const savedState = localStorage.getItem('sidebarCollapsedRestaurant');
+        setIsSidebarOpen(savedState !== 'true');
+        setIsMobileMenuOpen(false);
+        document.body.style.overflow = 'auto';
+      }
+    };
+    handleResize();
+    window.addEventListener('resize', handleResize);
+    return () => {
+      window.removeEventListener('resize', handleResize);
+      document.body.style.overflow = 'auto';
+    };
+  }, [isMobileMenuOpen]);
+
+  // Close mobile menu when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (isMobileMenuOpen && !e.target.closest('.sidebar') && !e.target.closest('.mobile-menu-toggle')) {
+        setIsMobileMenuOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [isMobileMenuOpen]);
+
+  // Update body overflow when mobile menu is open/closed
+  useEffect(() => {
+    if (isMobile) {
+      document.body.style.overflow = isMobileMenuOpen ? 'hidden' : 'auto';
+    }
+    return () => { document.body.style.overflow = 'auto'; };
+  }, [isMobileMenuOpen, isMobile]);
+
+  const toggleSidebar = () => {
+    if (isMobile) {
+      const next = !isMobileMenuOpen;
+      setIsMobileMenuOpen(next);
+      document.body.style.overflow = next ? 'hidden' : 'auto';
+    } else {
+      const next = !isSidebarOpen;
+      setIsSidebarOpen(next);
+      localStorage.setItem('sidebarCollapsedRestaurant', String(!next));
+    }
+  };
+
+  const closeMobileMenu = () => {
+    if (isMobile) setIsMobileMenuOpen(false);
+  };
 
   // Tap & Balance state
   const [tapDeviceId, setTapDeviceId] = useState('');
@@ -785,13 +851,33 @@ const [downloadMessage, setDownloadMessage] = useState('');
   };
 
   return (
-    <div className={`dashboard-container ${!isSidebarOpen && 'collapsed'}`}>
-      <div className={`sidebar${isSidebarOpen ? ' open' : ' collapsed'}`}>
+    <div className={`dashboard-container ${!isSidebarOpen && 'collapsed'} ${darkMode && 'dark-mode'}`}>
+      {/* Mobile Menu Overlay */}
+      <div
+        className={`mobile-overlay ${isMobileMenuOpen ? 'open' : ''}`}
+        onClick={closeMobileMenu}
+      />
+
+      {/* Mobile Header */}
+      {isMobile && (
+        <div className="mobile-header">
+          <button
+            className="mobile-menu-toggle"
+            onClick={toggleSidebar}
+            aria-label={isMobileMenuOpen ? 'Close menu' : 'Open menu'}
+          >
+            {isMobileMenuOpen ? <FiX /> : <FiMenu />}
+          </button>
+          <h3>Restaurant Panel</h3>
+        </div>
+      )}
+
+      <div className={`sidebar ${isMobileMenuOpen ? 'mobile-open' : ''} ${!isMobile && isSidebarOpen ? 'open' : ''}`}>
   <div className="sidebar-header">
     {isSidebarOpen && <h2>Restaurant Panel</h2>}
     <button
       className="toggle-btn"
-      onClick={() => setIsSidebarOpen(!isSidebarOpen)}
+      onClick={toggleSidebar}
       aria-label={isSidebarOpen ? "Collapse sidebar" : "Expand sidebar"}
     >
       {isSidebarOpen ? <FiX /> : <FiMenu />}
@@ -813,9 +899,6 @@ const [downloadMessage, setDownloadMessage] = useState('');
           <button className={`nav-item${selectedSection === 'report' ? ' active' : ''}`} onClick={() => setSelectedSection('report')}>
             <FiPieChart /> {isSidebarOpen && 'Report'}
           </button>
-          <button className={`nav-item${selectedSection === 'devices' ? ' active' : ''}`} onClick={() => setSelectedSection('devices')}>
-            <FiCreditCard /> {isSidebarOpen && 'Devices'}
-          </button>
           <button className={`nav-item${selectedSection === 'tap' ? ' active' : ''}`} onClick={() => setSelectedSection('tap')}>
             <FiCreditCard /> {isSidebarOpen && 'Tap & Balance'}
           </button>
@@ -823,12 +906,31 @@ const [downloadMessage, setDownloadMessage] = useState('');
             <FiSettings /> {isSidebarOpen && 'Settings'}
           </button>
         </nav>
+        <div className="sidebar-footer">
+          <button 
+            className="theme-toggle"
+            onClick={() => setDarkMode(!darkMode)}
+            aria-label={darkMode ? 'Switch to light mode' : 'Switch to dark mode'}
+          >
+            {darkMode ? <FiSun /> : <FiMoon />}
+            {isSidebarOpen && (darkMode ? 'Light Mode' : 'Dark Mode')}
+          </button>
+        </div>
       </div>
       <div className="main-content">
         <div className="top-navbar">
           <div className="nav-left">
-  <h3>Restaurant Dashboard</h3>
-</div>
+            {!isMobile && (
+              <button 
+                className="desktop-menu-toggle"
+                onClick={toggleSidebar}
+                aria-label="Toggle sidebar"
+              >
+                {isSidebarOpen ? <FiX /> : <FiMenu />}
+              </button>
+            )}
+            <h3>Restaurant Dashboard</h3>
+          </div>
           <div className="nav-right">
             <button className="notification-btn">
               <FiBell size={20} />
@@ -1054,57 +1156,52 @@ const [downloadMessage, setDownloadMessage] = useState('');
           {selectedSection === 'clients' && (
             <div style={deepseekCardStyle}>
               <h2 style={deepseekFormTitle}>Clients</h2>
-              <form onSubmit={handleAddClient} style={{ ...deepseekCardStyle, maxWidth: 500, margin: '0 auto 2rem auto', boxShadow: '0 4px 16px 0 rgba(60, 72, 100, 0.10)' }}>
-                <div style={deepseekFormTitle}>Add New Client</div>
-                <div style={{ display: 'grid', gap: '1.5rem' }}>
-                  <div style={deepseekFormGroup}>
+              <form onSubmit={handleAddClient} className="form-card">
+                <h3>Add New Client</h3>
+                <div className="form-grid">
+                  <div className="form-group">
                     <label>Name</label>
                     <input
                       type="text"
-                      style={deepseekInput}
                       placeholder="Enter client name"
                       value={newClient.name}
                       onChange={e => setNewClient({ ...newClient, name: e.target.value })}
                       required
                     />
                   </div>
-                  <div style={deepseekFormGroup}>
+                  <div className="form-group">
                     <label>Phone</label>
                     <input
                       type="text"
-                      style={deepseekInput}
                       placeholder="Enter phone number"
                       value={newClient.phone}
                       onChange={e => setNewClient({ ...newClient, phone: e.target.value })}
                       required
                     />
                   </div>
-                  <div style={deepseekFormGroup}>
+                  <div className="form-group">
                     <label>ID Number</label>
                     <input
                       type="text"
-                      style={deepseekInput}
                       placeholder="Enter ID number"
                       value={newClient.idNumber}
                       onChange={e => setNewClient({ ...newClient, idNumber: e.target.value })}
                       required
                     />
                   </div>
-                  <div style={deepseekFormGroup}>
+                  <div className="form-group">
                     <label>Card Number</label>
                     <input
                       type="text"
-                      style={deepseekInput}
                       placeholder="Enter card number"
                       value={newClient.cardNumber}
                       onChange={e => setNewClient({ ...newClient, cardNumber: e.target.value })}
                       required
                     />
                   </div>
-                  <div style={deepseekFormGroup}>
+                  <div className="form-group">
                     <label>Year of Study</label>
                     <select
-                      style={deepseekInput}
                       value={newClient.yearOfStudy}
                       onChange={e => setNewClient({ ...newClient, yearOfStudy: e.target.value })}
                       required
@@ -1117,19 +1214,18 @@ const [downloadMessage, setDownloadMessage] = useState('');
                       <option value="Y5+">Y5+ (Fifth Year+)</option>
                     </select>
                   </div>
-                  <div style={deepseekFormGroup}>
+                  <div className="form-group">
                     <label>Field of Study</label>
                     <input
                       type="text"
-                      style={deepseekInput}
                       placeholder="e.g., IT, Engineering, Medicine, Business"
                       value={newClient.fieldOfStudy}
                       onChange={e => setNewClient({ ...newClient, fieldOfStudy: e.target.value })}
                       required
                     />
                   </div>
-                  <button type="submit" style={deepseekButton} disabled={loadingClients}>Add Client</button>
                 </div>
+                <button type="submit" disabled={loadingClients}>Add Client</button>
                 {clientFormError && <div className="error-message" style={{ marginTop: '1rem' }}>{clientFormError}</div>}
                 {clientFormSuccess && <div className="success-message" style={{ marginTop: '1rem' }}>{clientFormSuccess}</div>}
               </form>
@@ -1138,31 +1234,31 @@ const [downloadMessage, setDownloadMessage] = useState('');
               ) : clientsError ? (
                 <div className="error-message">{clientsError}</div>
               ) : (
-                <div style={deepseekTableContainer}>
-                  <table style={deepseekTable} className="data-table">
+                <div className="table-container">
+                  <table className="data-table">
                     <thead>
                       <tr>
-                        <th style={deepseekTh}>Name</th>
-                        <th style={deepseekTh}>Phone</th>
-                        <th style={deepseekTh}>ID Number</th>
-                        <th style={deepseekTh}>Card Number</th>
-                        <th style={deepseekTh}>Year</th>
-                        <th style={deepseekTh}>Field</th>
-                        <th style={deepseekTh}>Amount</th>
-                        <th style={deepseekTh}>Actions</th>
+                        <th>Name</th>
+                        <th>Phone</th>
+                        <th>ID Number</th>
+                        <th>Card Number</th>
+                        <th>Year</th>
+                        <th>Field</th>
+                        <th>Amount</th>
+                        <th>Actions</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {clients.map((c, idx) => (
-                        <tr key={c._id} style={deepseekRow(idx)}>
-                          <td style={deepseekTd}>{c.name}</td>
-                          <td style={deepseekTd}>{c.phone}</td>
-                          <td style={deepseekTd}>{c.idNumber}</td>
-                          <td style={deepseekTd}>{c.cardNumber}</td>
-                          <td style={deepseekTd}>{c.yearOfStudy || '-'}</td>
-                          <td style={deepseekTd}>{c.fieldOfStudy || '-'}</td>
-                          <td style={deepseekTd}>Frw {calculateClientAmount(c).toLocaleString()}</td>
-                          <td style={{ ...deepseekTd, display: 'flex', gap: '0.5rem' }}>
+                      {clients.map((c) => (
+                        <tr key={c._id}>
+                          <td>{c.name}</td>
+                          <td>{c.phone}</td>
+                          <td>{c.idNumber}</td>
+                          <td>{c.cardNumber}</td>
+                          <td>{c.yearOfStudy || '-'}</td>
+                          <td>{c.fieldOfStudy || '-'}</td>
+                          <td>Frw {calculateClientAmount(c).toLocaleString()}</td>
+                          <td style={{ display: 'flex', gap: '0.5rem' }}>
                             <button className="action-btn card-btn" title="Update Card" onClick={() => handleUpdateCard(c.cardNumber)}><FiCreditCard /></button>
                             <button className="action-btn edit-btn" title="Edit Details" onClick={() => handleEditDetails(c)}><FiEdit /></button>
                             <button className="action-btn topup-btn" title="Top Up" onClick={() => handleTopUp(c)}><FiArrowUpCircle /></button>
@@ -1185,27 +1281,27 @@ const [downloadMessage, setDownloadMessage] = useState('');
               ) : logsError ? (
                 <div className="error-message">{logsError}</div>
               ) : (
-                <div style={deepseekTableContainer}>
-                  <table style={deepseekTable} className="data-table">
+                <div className="table-container">
+                  <table className="data-table">
                     <thead>
                       <tr>
-                        <th style={deepseekTh}>Date</th>
-                        <th style={deepseekTh}>Client</th>
-                        <th style={deepseekTh}>Action</th>
-                        <th style={deepseekTh}>Amount</th>
+                        <th>Date</th>
+                        <th>Client</th>
+                        <th>Action</th>
+                        <th>Amount</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {mealLogs.map((log, idx) => (
-                        <tr key={log._id} style={deepseekRow(idx)}>
-                          <td style={deepseekTd}>{log.timestamp ? new Date(log.timestamp).toLocaleString() : ''}</td>
-                          <td style={deepseekTd}>{log.clientName || (log.client && typeof log.client === 'object' ? log.client.name : log.client) || ''}</td>
-                          <td style={deepseekTd}>
+                      {mealLogs.map((log) => (
+                        <tr key={log._id}>
+                          <td>{log.timestamp ? new Date(log.timestamp).toLocaleString() : ''}</td>
+                          <td>{log.clientName || (log.client && typeof log.client === 'object' ? log.client.name : log.client) || ''}</td>
+                          <td>
                             <span className={`action-badge ${log.actionType}`}>
                               {log.actionType === 'purchase' ? '🍽️ Meal Purchase' : '💰 Top-up'}
                             </span>
                           </td>
-                          <td style={deepseekTd}>
+                          <td>
                             {log.amount ? `Frw ${log.amount}` : ''}
                           </td>
                         </tr>
@@ -1216,92 +1312,7 @@ const [downloadMessage, setDownloadMessage] = useState('');
               )}
             </div>
           )}
-          {selectedSection === 'devices' && (
-            <div style={deepseekCardStyle}>
-              <h2 style={deepseekFormTitle}>Device Management</h2>
-              <div className="devices-section" style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
-                <form onSubmit={handleRegisterCard} className="form-card">
-                  <h4>Register Card via MQTT</h4>
-                  <div className="form-group">
-                    <label>Device ID</label>
-                    <input 
-                      type="text" 
-                      className="form-control"
-                      value={registerDeviceId} 
-                      onChange={e => setRegisterDeviceId(e.target.value)} 
-                      required 
-                    />
-                  </div>
-                  <button type="submit" className="btn btn-primary" disabled={registerLoading}>
-                    {registerLoading ? 'Registering...' : 'Register Card'}
-                  </button>
-                  {registerError && <div className="error-message">{registerError}</div>}
-                  {registerResult && (
-                    <div className="success-message" style={{ marginTop: 8 }}>
-                      <div>Card registered successfully!</div>
-                      <div>Device ID: <b>{registerResult.deviceId}</b></div>
-                    </div>
-                  )}
-                </form>
-                <form onSubmit={handleSyncDevice} className="form-card">
-                  <h4>Sync Device Data</h4>
-                  <div className="form-group">
-                    <label>Device ID</label>
-                    <input 
-                      type="text" 
-                      className="form-control"
-                      value={syncDeviceId} 
-                      onChange={e => setSyncDeviceId(e.target.value)} 
-                      required 
-                    />
-                  </div>
-                  <div className="form-group">
-                    <label>Offline Taps</label>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                      {syncTaps.map((tap, idx) => (
-                        <div key={idx} style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                          <input
-                            type="text"
-                            className="form-control"
-                            placeholder="Card Number"
-                            value={tap.cardNumber}
-                            onChange={e => handleSyncTapChange(idx, 'cardNumber', e.target.value)}
-                          />
-                          <input
-                            type="number"
-                            className="form-control"
-                            placeholder="Amount Deducted"
-                            value={tap.offlineDeducted}
-                            onChange={e => handleSyncTapChange(idx, 'offlineDeducted', e.target.value)}
-                          />
-                          <button 
-                            type="button" 
-                            className="btn btn-outline btn-sm"
-                            onClick={() => handleRemoveSyncTap(idx)}
-                          >
-                            Remove
-                          </button>
-                        </div>
-                      ))}
-                      <button type="button" className="btn btn-outline btn-sm" onClick={handleAddSyncTap}>
-                        Add Tap
-                      </button>
-                    </div>
-                  </div>
-                  <button type="submit" className="btn btn-primary" disabled={syncLoading}>
-                    {syncLoading ? 'Syncing...' : 'Sync Device'}
-                  </button>
-                  {syncError && <div className="error-message">{syncError}</div>}
-                  {syncResult && (
-                    <div className="success-message" style={{ marginTop: 8 }}>
-                      <div>Device synced successfully!</div>
-                      <div>Synced taps: <b>{syncResult.syncedTaps}</b></div>
-                    </div>
-                  )}
-                </form>
-              </div>
-            </div>
-          )}
+          {/* Devices section removed */}
           {selectedSection === 'tap' && (
             <div style={deepseekCardStyle}>
               <h2 style={deepseekFormTitle}>Tap & Balance</h2>

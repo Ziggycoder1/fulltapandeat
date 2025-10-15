@@ -10,7 +10,6 @@ import { Chart, CategoryScale, LinearScale, BarElement, ArcElement, Title, Toolt
 import './AdminDashboard.css';
 import { apiRequest } from '../api';
 import Report from './Report';
-import Users from './Users';
 import UniversityAnalytics from './UniversityAnalytics';
 
 // Register Chart.js components
@@ -865,13 +864,6 @@ const AdminDashboard = () => {
           </button>
           
           <button 
-            className={`nav-item${selectedSection === 'users' ? ' active' : ''}`} 
-            onClick={() => setSelectedSection('users')}
-          >
-            <FiUsers /> {isSidebarOpen && 'Users'}
-          </button>
-          
-          <button 
             className={`nav-item${selectedSection === 'logs' ? ' active' : ''}`} 
             onClick={() => setSelectedSection('logs')}
           >
@@ -1167,120 +1159,7 @@ const AdminDashboard = () => {
                 </div>
               </div>
 
-              {/* Add Client Form */}
-              <div className="add-client-form">
-                <h3>Add New Client</h3>
-                <form onSubmit={handleAddClient} className="form-card">
-                  {/* Error and Success Messages */}
-                  {clientFormError && (
-                    <div className="error-message">
-                      <p>{clientFormError}</p>
-                    </div>
-                  )}
-                  {clientFormSuccess && (
-                    <div className="success-message">
-                      <p>{clientFormSuccess}</p>
-                    </div>
-                  )}
-                  <div className="form-grid">
-                    <div className="form-group">
-                      <label>Name</label>
-                      <input 
-                        type="text" 
-                        name="name"
-                        value={newClient.name} 
-                        onChange={handleNewClientChange} 
-                        required 
-                        placeholder="Enter client name"
-                      />
-                    </div>
-                    
-                    <div className="form-group">
-                      <label>Email</label>
-                      <input 
-                        type="email" 
-                        name="email"
-                        value={newClient.email} 
-                        onChange={handleNewClientChange} 
-                        required 
-                        placeholder="Enter email address"
-                      />
-                    </div>
-                    
-                    <div className="form-group">
-                      <label>Phone</label>
-                      <input 
-                        type="tel" 
-                        name="phone"
-                        value={newClient.phone} 
-                        onChange={handleNewClientChange} 
-                        required 
-                        placeholder="Enter phone number"
-                      />
-                    </div>
-                    
-                    <div className="form-group">
-                      <label>ID Number</label>
-                      <input 
-                        type="text" 
-                        name="idNumber"
-                        value={newClient.idNumber} 
-                        onChange={handleNewClientChange} 
-                        required 
-                        placeholder="Enter ID number"
-                      />
-                    </div>
-                    
-                    <div className="form-group">
-                      <label>Card Number</label>
-                      <input 
-                        type="text" 
-                        name="cardNumber"
-                        value={newClient.cardNumber} 
-                        onChange={handleNewClientChange} 
-                        required 
-                        placeholder="Enter card number"
-                      />
-                    </div>
-                    
-                    <div className="form-group">
-                      <label>Year of Study</label>
-                      <select 
-                        name="yearOfStudy"
-                        value={newClient.yearOfStudy} 
-                        onChange={handleNewClientChange} 
-                        required 
-                      >
-                        <option value="">Select year</option>
-                        <option value="Y1">Y1 - First Year</option>
-                        <option value="Y2">Y2 - Second Year</option>
-                        <option value="Y3">Y3 - Third Year</option>
-                        <option value="Y4">Y4 - Fourth Year</option>
-                        <option value="Y5+">Y5+ - Fifth Year+</option>
-                      </select>
-                    </div>
-                    
-                    <div className="form-group">
-                      <label>Field of Study</label>
-                      <input 
-                        type="text" 
-                        name="fieldOfStudy"
-                        value={newClient.fieldOfStudy} 
-                        onChange={handleNewClientChange} 
-                        required 
-                        placeholder="e.g., IT, Engineering, Medicine"
-                      />
-                    </div>
-                  </div>
-                  
-                  <div className="form-actions">
-                    <button type="submit" className="btn btn-primary" disabled={addingClient}>
-                      {addingClient ? <FiRefreshCw className="spinner" /> : <FiPlus />}
-                      {addingClient ? 'Adding Client...' : 'Add Client'}
-                    </button>
-                  </div>
-                </form>
-              </div>
+              
 
               {/* User Balances */}
               <div className="user-balances">
@@ -1600,8 +1479,6 @@ const AdminDashboard = () => {
               {editSuccess && <div className="success-message">{editSuccess}</div>}
             </div>
           )}
-
-{selectedSection === 'users' && <Users />}
 
           {selectedSection === 'logs' && (
             <div className="section-container">
