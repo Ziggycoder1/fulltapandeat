@@ -1,5 +1,5 @@
 // API utility for backend communication
-const BASE_URL = 'https://gd-tapeat.onrender.com'; // Change if your backend runs elsewhere
+const BASE_URL = 'http://localhost:8000'; // Change if your backend runs elsewhere
 
 // Helper for requests
 export async function apiRequest(endpoint, { method = 'GET', body, token } = {}) {

@@ -46,7 +46,7 @@ const RestaurantDashboard = () => {
   const [clients, setClients] = useState([]);
   const [loadingClients, setLoadingClients] = useState(false);
   const [clientsError, setClientsError] = useState('');
-  const [newClient, setNewClient] = useState({ name: '', phone: '', idNumber: '', cardNumber: '', yearOfStudy: '', fieldOfStudy: '' });
+  const [newClient, setNewClient] = useState({ name: '', email: '', phone: '', idNumber: '', cardNumber: '', yearOfStudy: '', fieldOfStudy: '' });
   const [clientFormError, setClientFormError] = useState('');
   const [clientFormSuccess, setClientFormSuccess] = useState('');
   const [clientActionError, setClientActionError] = useState('');
@@ -515,7 +515,7 @@ const [downloadMessage, setDownloadMessage] = useState('');
         token: localStorage.getItem('token'),
       });
       setClientFormSuccess('Client created successfully!');
-      setNewClient({ name: '', phone: '', idNumber: '', cardNumber: '', yearOfStudy: '', fieldOfStudy: '' });
+      setNewClient({ name: '', email: '', phone: '', idNumber: '', cardNumber: '', yearOfStudy: '', fieldOfStudy: '' });
       // Refresh client list
       setLoadingClients(true);
       apiRequest(`/restaurants/clients?restaurantId=${restaurantId}`, {
@@ -1170,6 +1170,15 @@ const [downloadMessage, setDownloadMessage] = useState('');
                     />
                   </div>
                   <div className="form-group">
+                    <label>Email</label>
+                    <input
+                      type="email"
+                      placeholder="Enter email address"
+                      value={newClient.email}
+                      onChange={e => setNewClient({ ...newClient, email: e.target.value })}
+                    />
+                  </div>
+                  <div className="form-group">
                     <label>Phone</label>
                     <input
                       type="text"
@@ -1239,6 +1248,7 @@ const [downloadMessage, setDownloadMessage] = useState('');
                     <thead>
                       <tr>
                         <th>Name</th>
+                        <th>Email</th>
                         <th>Phone</th>
                         <th>ID Number</th>
                         <th>Card Number</th>
@@ -1252,6 +1262,7 @@ const [downloadMessage, setDownloadMessage] = useState('');
                       {clients.map((c) => (
                         <tr key={c._id}>
                           <td>{c.name}</td>
+                          <td>{c.email || '-'}</td>
                           <td>{c.phone}</td>
                           <td>{c.idNumber}</td>
                           <td>{c.cardNumber}</td>
@@ -1333,6 +1344,7 @@ const [downloadMessage, setDownloadMessage] = useState('');
                     <div className="success-message" style={{ marginTop: 8 }}>
                       <div>Meal recorded!</div>
                       <div>Client: <b>{tapResult.clientName || tapResult.name}</b></div>
+                      {tapResult.email && <div>Email: <b>{tapResult.email}</b></div>}
                       <div>Remaining Balance: <b>{tapResult.remainingBalance || tapResult.balance}</b></div>
                     </div>
                   )}
@@ -1348,6 +1360,7 @@ const [downloadMessage, setDownloadMessage] = useState('');
                   {lookupResult && (
                     <div className="success-message" style={{ marginTop: 8 }}>
                       <div>Client: <b>{lookupResult.name}</b></div>
+                      {lookupResult.email && <div>Email: <b>{lookupResult.email}</b></div>}
                       <div>Card: <b>{lookupResult.cardNumber}</b></div>
                       <div>Subscriptions:</div>
                       <ul>
