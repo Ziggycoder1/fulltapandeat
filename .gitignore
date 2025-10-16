@@ -16,8 +16,7 @@ build/
 .next/
 
 # Environment files
-.env
-.env.*
+
 
 # Coverage
 coverage/
