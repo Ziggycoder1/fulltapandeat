@@ -21,6 +21,9 @@ const Login = () => {
           method: 'POST',
           body: { username, password },
         });
+        if (!data || !data.token) {
+          throw { status: 500, message: 'Login response missing token' };
+        }
         localStorage.setItem('token', data.token);
         navigate('/admin');
       } else {
@@ -28,6 +31,9 @@ const Login = () => {
           method: 'POST',
           body: { email, password },
         });
+        if (!data || !data.token) {
+          throw { status: 500, message: 'Login response missing token' };
+        }
         localStorage.setItem('token', data.token);
         navigate('/restaurant'); // Change to your restaurant dashboard route
       }
@@ -36,6 +42,8 @@ const Login = () => {
         setError('Invalid credentials.');
       } else if (err.status === 404) {
         setError(mode === 'admin' ? 'Admin not found.' : 'Restaurant not found.');
+      } else if (err.status === 500) {
+        setError(err.message || 'Login failed. Please try again.');
       } else {
         setError(err.message || 'Login failed. Please try again.');
       }
